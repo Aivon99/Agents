@@ -3,6 +3,8 @@ import requests
 import json
 import os 
 import API_List from LLM_API_List
+import threading
+
 
 '''
 OLLAMA_URL = "http://localhost:11434/api/generate"
@@ -18,12 +20,35 @@ def call_ollama():
     print(response.json())
 
 ''' 
+
+
 # the purpose of this is to only use the free tier level,
 # round robin approach
 # some APIs give multiple models, 
 # I don't expect to run out of tokens either way so Imma use only the most powerful models available (at least at this stage)
    
 
+current_index = 0
+lock = threading.Lock()  # To ensure thread-safe access
+
+def get_next_api():
+    global current_index
+
+    with lock:
+         with lock:
+            
+            # pretty ugly but it's life and it's midnight 
+            SelectedAPI = API_List[list(API_List.keys())[current_index]]
+
+
+            # Extract desired components
+            api_url = SelectedAPI["URL"]
+            APIKey = SelectedAPI["Key"]
+            model = SelectedAPI["Model"]
+
+            current_index = (current_index + 1) % len(API_List)
+
+    return api_url, APIKey, model
 
 
 

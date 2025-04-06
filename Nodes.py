@@ -14,11 +14,6 @@ from io import StringIO
 class LLMNode:
     def __init__(self, name: str):
         self.name = name
-        from APIKeys import Google_AI_Studio
-        self.googleAPI = Google_AI_Studio
-
-    def run(self, prompt: str) -> str:
-        return queryGemini(prompt, self.googleAPI)
 
     def __call__(self, prompt: str) -> str:
         return self.run(prompt)
