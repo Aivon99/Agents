@@ -52,17 +52,41 @@ class LLMQuery():
 
         return api_url, APIKey, model
     
-    def run_api_query(api_url, api_key, model, prompt):
+    @staticmethod
+    
+    def format_payload(api_config, prompt, token_limit): #Obviously not all APIs want the payload in the same format, would have been too easy
+    
+        if api_config["Format"] == "google":
+            return {"model": api_config["Model"], "input": prompt, "parameters": {"max_tokens": token_limit}}
+        
+        elif api_config["Format"] == "cohere":
+            return {"model": api_config["Model"], "prompt": prompt, "max_tokens": token_limit}
+        
+        elif api_config["Format"] == "huggingface":
+            return {"inputs": prompt, "parameters": {"max_tokens": token_limit}}
+        
+        elif api_config["Format"] == "open_source":
+            return {"model": api_config["Model"], "prompt": prompt, "max_tokens": token_limit}
+        else:
+            raise ValueError("Unknown API format")
+
+    def run_api_query(api_url, api_key, model, tokenLimit, prompt):
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
         
-        data = {
-            "model": model,
-            "prompt": prompt,
-            "max_tokens": 150  # Adjust as needed
-        }
+        if tokenLimit is None:
+            data = {
+                "model": model,
+                "prompt": prompt,
+            }
+        else:
+            data = {
+                "model": model,
+                "prompt": prompt,
+                "max_tokens": tokenLimit  
+            }
         
         try:
             response = requests.post(api_url, json=data, headers=headers)
@@ -73,10 +97,12 @@ class LLMQuery():
             print(f"API Request failed: {e}")
             return None
         
-    def __call__(self, prompt):
+    
+    
+    def __call__(self, prompt, tokenLimit):
+     
         api_url, api_key, model = self.get_next_api()
-
-        answer = self.run_api_query(api_url, api_key, model, prompt)
+        answer = self.run_api_query(api_url, api_key, model, tokenLimit prompt)
         
         return answer
     
