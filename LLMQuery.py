@@ -2,7 +2,8 @@ from google import genai
 import requests
 import json
 import os 
-import API_List from LLM_API_List
+from LLM_API_List import API_List
+
 import threading
 
 
@@ -28,18 +29,19 @@ def call_ollama():
 # I don't expect to run out of tokens either way so Imma use only the most powerful models available (at least at this stage)
    
 
-current_index = 0
-lock = threading.Lock()  # To ensure thread-safe access
+class LLMQuery():
+    lock = threading.Lock()  # Class-level lock, trying not to cause probles when using multiple instances
 
-def get_next_api():
-    global current_index
+    def __init__(self):
+        self.current_index = 0
+        
+    def get_next_api():
+        global current_index
 
-    with lock:
-         with lock:
+        with LLMQuery.lock:            
             
             # pretty ugly but it's life and it's midnight 
             SelectedAPI = API_List[list(API_List.keys())[current_index]]
-
 
             # Extract desired components
             api_url = SelectedAPI["URL"]
@@ -48,10 +50,36 @@ def get_next_api():
 
             current_index = (current_index + 1) % len(API_List)
 
-    return api_url, APIKey, model
+        return api_url, APIKey, model
+    
+    def run_api_query(api_url, api_key, model, prompt):
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "model": model,
+            "prompt": prompt,
+            "max_tokens": 150  # Adjust as needed
+        }
+        
+        try:
+            response = requests.post(api_url, json=data, headers=headers)
+            response.raise_for_status()  # Raises an exception for HTTP errors
+            result = response.json()
+            return result  # Or customize this to return only the desired part of the response
+        except requests.RequestException as e:
+            print(f"API Request failed: {e}")
+            return None
+        
+    def __call__(self, prompt):
+        api_url, api_key, model = self.get_next_api()
 
-
-
+        answer = self.run_api_query(api_url, api_key, model, prompt)
+        
+        return answer
+    
 
 def query_google_ai(prompt, googleAPI):
     url = f"https://generativelanguage.googleapis.com/v1beta2/models/{googleAPI['Model']}:generateText"
