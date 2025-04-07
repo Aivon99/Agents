@@ -28,7 +28,6 @@ def call_ollama():
 # some APIs give multiple models, 
 # I don't expect to run out of tokens either way so Imma use only the most powerful models available (at least at this stage)
    
-
 class LLMQuery():
     lock = threading.Lock()  # Class-level lock, trying not to cause probles when using multiple instances
 
@@ -49,15 +48,15 @@ class LLMQuery():
             model = SelectedAPI["Model"]
 
             current_index = (current_index + 1) % len(API_List)
-
-        return api_url, APIKey, model
+        print("calling : ", list(API_List.keys())[current_index], " with model: ",  model)
+        return list(API_List.keys())[current_index], api_url, APIKey, model
     
     @staticmethod
     
     def format_payload(api_config, prompt, token_limit): #Obviously not all APIs want the payload in the same format, would have been too easy
     
         if api_config["Format"] == "google":
-            return {"model": api_config["Model"], "input": prompt, "parameters": {"max_tokens": token_limit}}
+            return None # Google API is handled separately in the query_google_ai function 
         
         elif api_config["Format"] == "cohere":
             return {"model": api_config["Model"], "prompt": prompt, "max_tokens": token_limit}
@@ -70,23 +69,8 @@ class LLMQuery():
         else:
             raise ValueError("Unknown API format")
 
-    def run_api_query(api_url, api_key, model, tokenLimit, prompt):
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        }
+    def run_api_query(api_url, api_key, model, Payload):
         
-        if tokenLimit is None:
-            data = {
-                "model": model,
-                "prompt": prompt,
-            }
-        else:
-            data = {
-                "model": model,
-                "prompt": prompt,
-                "max_tokens": tokenLimit  
-            }
         
         try:
             response = requests.post(api_url, json=data, headers=headers)
@@ -99,42 +83,31 @@ class LLMQuery():
         
     
     
-    def __call__(self, prompt, tokenLimit):
+    def __call__(self, Payload):
      
-        api_url, api_key, model = self.get_next_api()
-        answer = self.run_api_query(api_url, api_key, model, tokenLimit prompt)
+        api_name, api_url, api_key, model = self.get_next_api()
+        
+        formatted_payload = self.format_payload(API_List[api_name], Payload) #assuming Payload contains all relevant info 
+
+        if(api_name == "Google_AI_Studio"):
+            answer = queryGemini(formatted_payload, api_key)
+        else:
+            answer = self.run_api_query(api_url, api_key, model, formatted_payload)
         
         return answer
     
-
-def query_google_ai(prompt, googleAPI):
-    url = f"https://generativelanguage.googleapis.com/v1beta2/models/{googleAPI['Model']}:generateText"
-    headers = {
-        "Authorization": f"Bearer {googleAPI['API_Key']}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "prompt": {"text": prompt},
-        "temperature": 0.7,
-        "maxOutputTokens": 512
-    }
-
-    response = requests.post(url, headers=headers, json=payload)
-
-    if response.status_code == 200:
-        return response.json()["candidates"][0]["output"]
-    else:
-        return f"Error {response.status_code}: {response.json().get('error', {}).get('message', 'Unknown error')}"
-
-
-
-def queryGemini(prompt, googleAPI):
+def queryGemini(Payload, googleAPI):
 
     client = genai.Client(api_key= googleAPI["API_Key"] )
     response = client.models.generate_content(
         model = googleAPI["Model"],
-        contents=prompt,
+        contents=Payload,
     )
     return response
     
+'''
+Payload variable expected structure: 
 
+
+
+'''
