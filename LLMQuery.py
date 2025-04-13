@@ -53,19 +53,65 @@ class LLMQuery():
     
     @staticmethod
     
-    def format_payload(api_config, prompt, token_limit): #Obviously not all APIs want the payload in the same format, would have been too easy
+    def format_payload(api_name, Payload): #Obviously not all APIs want the payload in the same format, would have been too easy
     
-        if api_config["Format"] == "google":
+        if api_name == "google":
             return None # Google API is handled separately in the query_google_ai function 
         
-        elif api_config["Format"] == "cohere":
-            return {"model": api_config["Model"], "prompt": prompt, "max_tokens": token_limit}
+        elif api_name == "cohere":
+            return {
+        "model": "mistral-small-latest",
+        "temperature": 1.5,
+        "top_p": 1,
+        "max_tokens": 0,
+        "stream": false,
+        "stop": "string",
+        "random_seed": 0,
+        "messages": [
+            {
+            "role": "user",
+            "content": "Who is the best French painter? Answer in one short sentence."
+            }
+        ],
+        "response_format": {
+            "type": "text",
+            "json_schema": {
+            "name": "string",
+            "description": "string",
+            "schema": {},
+            "strict": false
+            }
+        },
+        "tools": [
+            {
+            "type": "function",
+            "function": {
+                "name": "string",
+                "description": "",
+                "strict": false,
+                "parameters": {}
+            }
+            }
+        ],
+        "tool_choice": "auto",
+        "presence_penalty": 0,
+        "frequency_penalty": 0,
+        "n": 1,
+        "prediction": {
+            "type": "content",
+            "content": ""
+        },
+        "parallel_tool_calls": true,
+        "safe_prompt": false
+        }
         
-        elif api_config["Format"] == "huggingface":
-            return {"inputs": prompt, "parameters": {"max_tokens": token_limit}}
+        elif api_name == "huggingface":
+            return {"inputs": None, "parameters": {"max_tokens": None}}
         
-        elif api_config["Format"] == "open_source":
-            return {"model": api_config["Model"], "prompt": prompt, "max_tokens": token_limit}
+        elif api_name == "open_source":
+            return {"model": None, "prompt": None, "max_tokens": None}
+        elif api_name == "local":
+            return {"model": None, "prompt": None, "max_tokens": None}
         else:
             raise ValueError("Unknown API format")
 
@@ -87,20 +133,23 @@ class LLMQuery():
      
         api_name, api_url, api_key, model = self.get_next_api()
         
-        formatted_payload = self.format_payload(API_List[api_name], Payload) #assuming Payload contains all relevant info 
-
-        if(api_name == "Google_AI_Studio"):
-            answer = queryGemini(formatted_payload, api_key)
-        else:
-            answer = self.run_api_query(api_url, api_key, model, formatted_payload)
+        formatted_payload = self.format_payload(api_name, Payload) #assuming Payload contains all relevant info 
+        try:
+            if(api_name == "Google_AI_Studio"):
+                answer = queryGemini(formatted_payload, api_key, model)
+            else:
+                answer = self.run_api_query(api_url, api_key, model, formatted_payload)
+            return answer
         
-        return answer
-    
-def queryGemini(Payload, googleAPI):
+        except requests.RequestException as e:
+            print(f"API Request failed: {e}")
+            return None
+        
+def queryGemini(Payload, api_key, model):
 
-    client = genai.Client(api_key= googleAPI["API_Key"] )
+    client = genai.Client(api_key= api_key)
     response = client.models.generate_content(
-        model = googleAPI["Model"],
+        model = model,
         contents=Payload,
     )
     return response
@@ -108,6 +157,5 @@ def queryGemini(Payload, googleAPI):
 '''
 Payload variable expected structure: 
 
-
-
 '''
+
