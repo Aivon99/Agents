@@ -2,6 +2,7 @@ from google import genai
 import requests
 import json
 import os 
+import time
 from LLM_API_List import API_List
 
 import threading
@@ -23,12 +24,46 @@ def call_ollama():
 ''' 
 
 
-# the purpose of this is to only use the free tier level,
-# round robin approach
-# some APIs give multiple models, 
-# I don't expect to run out of tokens either way so Imma use only the most powerful models available (at least at this stage)
-   
-class LLMQuery():
+
+
+# the purpose of this is to only use the free tier level, piicking models based on type of the task
+# semi round robin approach
+
+class LeakyBucketLimiter():
+    """
+    Token bucket rate limiter for APIs that regenerate gradually
+    (e.g. X tokens per minute).
+    """
+    def __init__(self, capacity, refill_rate):
+        """
+        capacity    = max tokens in the bucket
+        refill_rate = tokens regenerated per second
+        """
+        self.capacity = capacity
+        self.tokens = capacity
+        self.refill_rate = refill_rate
+        self.tokens = capacity
+        self.last_refill = time.time()
+        
+        self.lock = threading.Lock()
+
+
+    def AskUpdate_tokens(self):
+        # if available asks API how many tokens are available 
+        pass
+
+class FixedWindowLimiter():
+    def __init__():
+        pass
+
+class LLMTokenManager():
+    def __init__(self):
+        pass
+
+    
+
+
+class LLMQueryManager():
     lock = threading.Lock()  # Class-level lock, trying not to cause probles when using multiple instances
 
     def __init__(self):
@@ -37,7 +72,7 @@ class LLMQuery():
     def get_next_api():
         global current_index
 
-        with LLMQuery.lock:            
+        with LLMQueryManager.lock:            
             
             # pretty ugly but it's life and it's midnight 
             SelectedAPI = API_List[list(API_List.keys())[current_index]]
@@ -126,8 +161,24 @@ class LLMQuery():
         except requests.RequestException as e:
             print(f"API Request failed: {e}")
             return None
-        
+            
+    def queryGemini(Payload, api_key, model):
+
+        client = genai.Client(api_key= api_key)
+        response = client.models.generate_content(
+            model = model,
+            contents=Payload,
+        )
+        return response
     
+    def format_output(api_name, response):
+        '''
+        Format the output based on the API response structure.
+
+        '''        
+        #TODO: Format
+        #TODO: check success code, if unsuccessful, re run the operation and log relevant info 
+        pass
     
     def __call__(self, Payload):
      
@@ -136,26 +187,13 @@ class LLMQuery():
         formatted_payload = self.format_payload(api_name, Payload) #assuming Payload contains all relevant info 
         try:
             if(api_name == "Google_AI_Studio"):
-                answer = queryGemini(formatted_payload, api_key, model)
+                answer = self.queryGemini(formatted_payload, api_key, model)
             else:
                 answer = self.run_api_query(api_url, api_key, model, formatted_payload)
-            return answer
+            return self.format_output(answer)
         
         except requests.RequestException as e:
             print(f"API Request failed: {e}")
             return None
-        
-def queryGemini(Payload, api_key, model):
-
-    client = genai.Client(api_key= api_key)
-    response = client.models.generate_content(
-        model = model,
-        contents=Payload,
-    )
-    return response
     
-'''
-Payload variable expected structure: 
-
-'''
 
