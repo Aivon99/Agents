@@ -142,29 +142,13 @@ class TokenManager:
 class LLMQueryManager():
     lock = threading.Lock()  # Class-level lock, trying not to cause problems when using multiple instances
 
-    def __init__(self):
-        self.current_index = 0
-        
-    def get_next_api():
-        global current_index
-
-        with LLMQueryManager.lock:            
-            
-            # pretty ugly but it's life and it's midnight 
-            SelectedAPI = API_List[list(API_List.keys())[current_index]]
-
-            # Extract desired components
-            api_url = SelectedAPI["URL"]
-            APIKey = SelectedAPI["Key"]
-            model = SelectedAPI["Model"]
-
-            current_index = (current_index + 1) % len(API_List)
-        print("calling : ", list(API_List.keys())[current_index], " with model: ",  model)
-        return list(API_List.keys())[current_index], api_url, APIKey, model
+    def __init__(self, tokenManager = None):
+        if tokenManager is not None:
+            self.token_manager = tokenManager        
+        else:
+            self.token_manager = TokenManager()
     
-    @staticmethod
-    
-    def format_payload(api_name, Payload): #Obviously not all APIs want the payload in the same format, would have been too easy
+    def format_payload(api_name, Payload): #Obviously not all APIs want the payload in the same format, would have been too easy #TODO lookup and finish
     
         if api_name == "google":
             return None # Google API is handled separately in the query_google_ai function 
@@ -256,11 +240,43 @@ class LLMQueryManager():
         #TODO: check success code, if unsuccessful, re run the operation and log relevant info 
         pass
     
-    def __call__(self, Payload):
-     
-        api_name, api_url, api_key, model = self.get_next_api()
+    def get_api_specs(name):
+        
+        with LLMQueryManager.lock:            
+            
+            # pretty ugly but it's life and it's midnight 
+            SelectedAPI = API_List[name]
+
+            # Extract desired components
+            api_url = SelectedAPI["URL"]
+            APIKey = SelectedAPI["Key"]
+            model = SelectedAPI["Model"]
+ 
+            #TODO add logging 
+
+        return api_url, APIKey, model
+    
+    @staticmethod
+
+
+
+    def compute_cost(self, request): #TODO method to compute token cost of request 
+        pass 
+
+   
+   
+   
+    def __call__(self, Payload, request_type=None):
+        
+        cost = self.compute_cost(request)
+
+        api_name = self.token_manager(cost=1, request_type=request_type) #TODO compute cost based on payload
+
+        api_url, api_key, model = self.get_api_specs(api_name)
         
         formatted_payload = self.format_payload(api_name, Payload) #assuming Payload contains all relevant info 
+        
+        
         try:
             if(api_name == "Google_AI_Studio"):
                 answer = self.queryGemini(formatted_payload, api_key, model)
