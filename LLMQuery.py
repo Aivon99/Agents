@@ -7,7 +7,7 @@ from collections import deque
 import threading
 
 from LLM_API_List import API_List
-
+from LLM_API_List import LLM_by_type
 
 '''
 OLLAMA_URL = "http://localhost:11434/api/generate"
@@ -71,7 +71,11 @@ class LeakyBucketLimiter():
             if self.tokens >= cost:
                 return True
             return False
-        
+
+    def get_tokens(self):
+        with self.lock:
+            return self.tokens    
+
     def update_tokens(self, cost=1): #the cost is updated after the query is done    
         with self.lock:
             self.locked = False
@@ -108,19 +112,35 @@ class TokenManager:
         if limiter is None:
              Warning(f"API '{name}' not registered") #might later change to exception
         return limiter.allow_request(cost)
-    
-    def __call__(self, cost=1):
 
-        for name, limiter in self.limiters.items():
+    def request_result(self, name, cost=1, success=True):
+        """To be called after the request is done to update the token count ad temporarily remove the API if call unsuccessful """
+
+        limiter = self.limiters.get(name)
+
+        if limiter is None:
+             Warning(f"API '{name}' not registered") #might later change to exception
+        if success:
+            limiter.update_tokens(cost)
+        else:
+            limiter.update_tokens(limiter.get_tokens()) # set available tokens to 0 
+            #TODO add removal from list and thread timer to re add 
+
+    def __call__(self, cost=1, request_type=None):
+
+        if request_type is None or request_type not in self.limiters:
+            request_type = "generic"  # default type
+
+
+        for name in LLM_by_type[request_type]:
+            limiter = self.limiters.get(name)
             if limiter.allow_request(cost):
                 return name
-        
-        
         return None  # All APIs are rate-limited
-
-
+    
+    
 class LLMQueryManager():
-    lock = threading.Lock()  # Class-level lock, trying not to cause probles when using multiple instances
+    lock = threading.Lock()  # Class-level lock, trying not to cause problems when using multiple instances
 
     def __init__(self):
         self.current_index = 0

@@ -31,3 +31,10 @@ API_List = {
     },
 
 }
+
+LLM_by_type = {
+    "text": ["Google_AI_Studio", "OpenAI", "Claude"],
+    "code": ["OpenAI", "Google_AI_Studio"],
+    "image": ["DALL-E", "Google_AI_Studio"],
+    "generic": ["Google_AI_Studio", "OpenAI", "Claude"],
+    }
