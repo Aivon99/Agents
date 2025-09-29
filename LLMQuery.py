@@ -5,6 +5,9 @@ import os
 import time
 from collections import deque
 import threading
+import tiktoken
+        
+
 
 from LLM_API_List import API_List
 from LLM_API_List import LLM_by_type
@@ -258,24 +261,22 @@ class LLMQueryManager():
     
     @staticmethod
 
+    def compute_cost(self, payload): 
+        text = payload #TODO stud
 
+        encoding = tiktoken.encoding_for_model("gpt-4")  # stud, general estimation
+        return len(encoding.encode(text))
+        
+    
 
-    def compute_cost(self, request): #TODO method to compute token cost of request 
-        pass 
-
-   
-   
-   
     def __call__(self, Payload, request_type=None):
         
-        cost = self.compute_cost(request)
+        cost = self.compute_cost(request_type) #placeholder,#TODO do on base of payload
 
-        api_name = self.token_manager(cost=1, request_type=request_type) #TODO compute cost based on payload
-
+        api_name = self.token_manager(cost=cost, request_type=request_type)
         api_url, api_key, model = self.get_api_specs(api_name)
         
         formatted_payload = self.format_payload(api_name, Payload) #assuming Payload contains all relevant info 
-        
         
         try:
             if(api_name == "Google_AI_Studio"):
@@ -289,3 +290,4 @@ class LLMQueryManager():
             return None
     
 
+#TODO Payload structuring, API online searching, error handling, logging, cost computation, output formatting
