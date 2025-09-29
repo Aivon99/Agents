@@ -3,15 +3,14 @@ import requests
 import json
 import os 
 import time
-from LLM_API_List import API_List
-
+from collections import deque
 import threading
+
+from LLM_API_List import API_List
 
 
 '''
 OLLAMA_URL = "http://localhost:11434/api/generate"
-
-
 def call_ollama():
     payload = {
         "model": "llama3.2",
@@ -22,45 +21,102 @@ def call_ollama():
     print(response.json())
 
 ''' 
-
-
-
-
 # the purpose of this is to only use the free tier level, piicking models based on type of the task
 # semi round robin approach
-
 class LeakyBucketLimiter():
     """
     Token bucket rate limiter for APIs that regenerate gradually
     (e.g. X tokens per minute).
     """
-    def __init__(self, capacity, refill_rate):
+
+    def __init__(self, capacity, refill_rate, rate_type='seconds'):
         """
         capacity    = max tokens in the bucket
         refill_rate = tokens regenerated per second
+        rate_type = 'seconds', 'minutes', 'hours' or 'day', unit of measure for refill_rate
         """
+        
         self.capacity = capacity
         self.tokens = capacity
+
         self.refill_rate = refill_rate
-        self.tokens = capacity
+        self.rate_type = rate_type
         self.last_refill = time.time()
         
+        self.locked = False # to avoid using semaphores at this stage, set to True at the request time, set to False when token count is updated after the query is done
+
         self.lock = threading.Lock()
 
+    def allow_request(self, cost=1):
+        """Try to consume tokens. Return True if allowed, else False."""
+        with self.lock:
+            self.locked = True
+            now = time.time()
+            elapsed = now - self.last_refill
+            # refill based on time passed
+            if self.rate_type == 'minutes':
+                time_units_elapsed = elapsed % 60
+            elif self.rate_type == 'hours':
+                time_units_elapsed = elapsed % (60 * 60)
+            elif self.rate_type == 'days':
+                time_units_elapsed = elapsed % (60 * 60 * 24)
+            else:  # default to seconds
+                time_units_elapsed = 0
+                Warning("rate_type not among considered types")
+        
+        
+            self.tokens = min(self.capacity, self.tokens + time_units_elapsed * self.refill_rate)
+            self.last_refill = now
 
-    def AskUpdate_tokens(self):
+            if self.tokens >= cost:
+                return True
+            return False
+        
+    def update_tokens(self, cost=1): #the cost is updated after the query is done    
+        with self.lock:
+            self.locked = False
+            self.tokens -= cost
+            
+    def AskUpdateCapacity(self):
         # if available asks API how many tokens are available 
         pass
 
-class FixedWindowLimiter():
-    def __init__():
-        pass
-
-class LLMTokenManager():
+class TokenManager:
+    """
+    Central dispatcher that manages multiple APIs with different
+    rate limiting strategies.
+    """
     def __init__(self):
-        pass
+        self.limiters = {
+            "Google_AI_Studio": LeakyBucketLimiter(capacity=100, refill_rate=1/60, rate_type='seconds'), #TODO to update, is a placeholder 
+            "Claude": LeakyBucketLimiter(capacity=90, refill_rate=90/60, rate_type='seconds'), # to update, is a placeholder
+            "OpenAI": LeakyBucketLimiter(capacity=3500, refill_rate=3500/60, rate_type='seconds') # to update, is a placeholder
+        }
 
+    def add_api(self, name, limiter):
+        """Register an API with its limiter.
+            limiter is a LeakyBucketLimiter or similar object
+        """
+        self.limiters[name] = limiter
+
+    def request(self, name, cost=1):
+        """
+        Attempt to make a request on a given API.
+        Returns True if allowed, False if rate-limited.
+        """
+        limiter = self.limiters.get(name)
+        if limiter is None:
+             Warning(f"API '{name}' not registered") #might later change to exception
+        return limiter.allow_request(cost)
     
+    def __call__(self, cost=1):
+
+        for name, limiter in self.limiters.items():
+            if limiter.allow_request(cost):
+                return name
+        
+        
+        return None  # All APIs are rate-limited
 
 
 class LLMQueryManager():
