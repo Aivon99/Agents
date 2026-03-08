@@ -1,8 +1,8 @@
 from queryComp import queryGemini
+
 import numpy as np
 import pandas as pd 
 import os 
-from APIKeys import Kaggle_API
 from kaggle.api.kaggle_api_extended import KaggleApi
 from typing import List, Dict
 import json
@@ -10,13 +10,20 @@ from io import StringIO
 
 
 
-# Generic LLM 
-class LLMNode:
-    def __init__(self, name: str):
+
+class ManagerNode:
+    def __init__(self, name="ManagerNode"):
         self.name = name
 
-    def __call__(self, prompt: str) -> str:
-        return self.run(prompt)
+    def run(self, task_description: str, available_tools: List[str]) -> Dict[str, str]:
+        # Placeholder logic for task decomposition
+        subtasks = [{"subtask": f"Subtask {i+1} for {task_description}"} for i in range(3)]
+        return {"task_description": task_description, "subtasks": subtasks}
+
+    def __call__(self, task_description: str, available_tools: List[str]) -> Dict[str, str]:
+        return self.run(task_description, available_tools)
+
+
 
 # Code execution
 class CodeExecutionNode:
@@ -35,7 +42,28 @@ class CodeExecutionNode:
     def __call__(self, code: str) -> dict:
         return self.run(code)
 
-# Kaggle Data Import
+class CodeWriterNode:
+
+    def __init__(self):
+        pass
+
+    def __call__(self):
+        pass
+
+
+class CodeCheckingNode:
+    def __init__(self):
+        pass
+
+
+class WebSearchNode:
+    def __init__(self):
+        pass
+
+class TelegramNode:
+    def __init__(self):
+        pass
+
 
 class KaggleImport:
     def __init__(self, name: str):
